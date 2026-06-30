@@ -62,6 +62,11 @@ export default function Home() {
       ruta: '/posiciones',
     },
     {
+      titulo: 'Historial de jugador',
+      icono: '📋',
+      ruta: '/historial-jugador',
+    },
+    {
       titulo: 'Reglas',
       icono: '📜',
       ruta: '/reglas',
@@ -70,19 +75,19 @@ export default function Home() {
 
   const admin = [
     {
-      titulo: 'Registrar Equipos',
-      icono: '⚽',
+      titulo: 'Equipos',
+      icono: '🎏',
       ruta: '/admin-equipos',
     },
     {
-      titulo: 'Restablecer contraseña',
-      icono: '🔑',
+      titulo: 'Resetear',
+      icono: '🔐',
       ruta: '/reset-password',
     },
     {
-      titulo: 'Códigos de registro',
-      icono: '🎫',
-      ruta: '/admin-codigos',
+      titulo: 'Marcador',
+      icono: '⚽',
+      ruta: '/registrar-marcador',
     },
   ]
 

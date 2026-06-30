@@ -274,7 +274,7 @@ export default function RegistrarMarcadorPage() {
               className="bg-white rounded-3xl shadow-xl border border-gray-200 p-5"
             >
               <p className="text-sm text-gray-700 font-bold mb-4">
-                Grupo {partido.grupo} · Fase {partido.fase} · 🗓️{' '}
+                Fase {partido.fase} · 🗓️{' '}
                 {formatearFecha(partido.fecha_hora)}
               </p>
 

@@ -38,7 +38,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-3xl font-black">
-            La Polla del Mundial
+            La Polla del Mundial!!
           </h1>
 
           <p className="text-yellow-300 font-bold mt-2">
@@ -58,7 +58,7 @@ export default function LoginPage() {
           />
 
           <input
-            type="password"
+            type="email"
             placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
