@@ -29,12 +29,20 @@ function fechaEsPermitida(fecha: string) {
   return fecha > fechaColombia(0)
 }
 
+function estiloCampo(estado: string | undefined) {
+  if (estado === 'modificado') return 'border-red-500 bg-red-50'
+  if (estado === 'guardado') return 'border-green-500 bg-green-50'
+  return 'border-gray-300 bg-white'
+}
+
 export default function PronosticosPorFechaPage() {
   const [usuario, setUsuario] = useState<any>(null)
-  const [fechaSeleccionada, setFechaSeleccionada] = useState('')
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaColombia(1))
   const [pronosticos, setPronosticos] = useState<any[]>([])
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('')
+  const [mensajesPorPronostico, setMensajesPorPronostico] = useState<any>({})
+  const [estadoPorPronostico, setEstadoPorPronostico] = useState<any>({})
 
   useEffect(() => {
     cargarUsuario()
@@ -51,11 +59,18 @@ export default function PronosticosPorFechaPage() {
     }
 
     setUsuario(user)
+    cargarPartidosPorFecha(fechaColombia(1), user.id)
   }
 
-  async function cargarPartidosPorFecha(fecha: string) {
+  async function cargarPartidosPorFecha(fecha: string, usuarioIdParam?: string) {
     setMensaje('')
+    setMensajesPorPronostico({})
+    setEstadoPorPronostico({})
     setPronosticos([])
+
+    const usuarioId = usuarioIdParam || usuario?.id
+
+    if (!usuarioId) return
 
     if (!fechaEsPermitida(fecha)) {
       setMensaje('No puedes modificar partidos de hoy ni de fechas anteriores.')
@@ -83,7 +98,7 @@ export default function PronosticosPorFechaPage() {
           equipo_2:equipos!partidos_equipo_2_id_fkey(id, nombre)
         )
       `)
-      .eq('usuario_id', usuario.id)
+      .eq('usuario_id', usuarioId)
       .gte('partido.fecha_hora', inicio)
       .lte('partido.fecha_hora', fin)
 
@@ -116,16 +131,31 @@ export default function PronosticosPorFechaPage() {
           : p
       )
     )
+
+    setEstadoPorPronostico((actual: any) => ({
+      ...actual,
+      [id]: 'modificado',
+    }))
+
+    setMensajesPorPronostico((actual: any) => ({
+      ...actual,
+      [id]: 'Tienes cambios pendientes por guardar.',
+    }))
   }
 
   async function guardarPronostico(pronostico: any) {
+    setMensaje('')
+
     if (
       pronostico.goles_equipo_1 === '' ||
       pronostico.goles_equipo_2 === '' ||
       pronostico.goles_equipo_1 === null ||
       pronostico.goles_equipo_2 === null
     ) {
-      setMensaje('Debes ingresar marcador para ambos equipos.')
+      setMensajesPorPronostico((actual: any) => ({
+        ...actual,
+        [pronostico.id]: 'Debes ingresar marcador para ambos equipos.',
+      }))
       return
     }
 
@@ -140,12 +170,22 @@ export default function PronosticosPorFechaPage() {
       .eq('usuario_id', usuario.id)
 
     if (error) {
-      setMensaje(error.message)
+      setMensajesPorPronostico((actual: any) => ({
+        ...actual,
+        [pronostico.id]: error.message,
+      }))
       return
     }
 
-    setMensaje('Pronóstico actualizado correctamente.')
-    setTimeout(() => setMensaje(''), 2500)
+    setEstadoPorPronostico((actual: any) => ({
+      ...actual,
+      [pronostico.id]: 'guardado',
+    }))
+
+    setMensajesPorPronostico((actual: any) => ({
+      ...actual,
+      [pronostico.id]: 'Pronóstico guardado correctamente.',
+    }))
   }
 
   return (
@@ -161,7 +201,7 @@ export default function PronosticosPorFechaPage() {
               </h1>
 
               <p className="text-gray-700 mt-2 font-medium">
-                Elige una fecha futura y registra tus marcadores antes del día del partido.
+                Si modificas un marcador, el campo se pondrá rojo hasta que lo guardes.
               </p>
             </div>
 
@@ -210,17 +250,21 @@ export default function PronosticosPorFechaPage() {
           </p>
         </section>
 
+        {mensaje && (
+          <div className="bg-red-100 border border-red-400 rounded-2xl p-4 mb-6 text-red-800 font-bold">
+            {mensaje}
+          </div>
+        )}
+
         <section className="bg-white rounded-3xl shadow-xl p-5 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div>
               <h2 className="text-2xl font-black text-green-800">
-                {fechaSeleccionada
-                  ? `Partidos del ${fechaSeleccionada}`
-                  : 'Partidos disponibles'}
+                Partidos del {fechaSeleccionada}
               </h2>
 
               <p className="text-gray-700">
-                Selecciona una fecha para consultar y actualizar tus pronósticos.
+                Rojo = cambios pendientes. Verde = guardado correctamente.
               </p>
             </div>
 
@@ -228,12 +272,6 @@ export default function PronosticosPorFechaPage() {
               {pronosticos.length} partidos
             </div>
           </div>
-
-          {mensaje && (
-            <p className="mb-4 bg-green-100 border border-green-400 text-green-900 font-bold rounded-xl p-3">
-              {mensaje}
-            </p>
-          )}
 
           {cargando && (
             <p className="text-gray-700 font-bold">Cargando partidos...</p>
@@ -246,64 +284,86 @@ export default function PronosticosPorFechaPage() {
           )}
 
           <div className="space-y-4">
-            {pronosticos.map((pronostico: any) => (
-              <div
-                key={pronostico.id}
-                className="bg-gray-50 border border-gray-200 rounded-3xl p-5 shadow-md"
-              >
-                <p className="text-sm text-gray-700 font-bold mb-4">
-                  Fase {pronostico.partido.fase} · 🗓️{' '}
-                  {formatearFecha(pronostico.partido.fecha_hora)}
-                </p>
+            {pronosticos.map((pronostico: any) => {
+              const estado = estadoPorPronostico[pronostico.id]
 
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_90px_40px_90px_1fr] gap-3 items-center">
-                  <p className="font-black text-lg text-green-900 md:text-right">
-                    {pronostico.partido.equipo_1.nombre}
-                  </p>
-
-                  <input
-                    type="number"
-                    min="0"
-                    className="border-2 border-gray-300 rounded-2xl p-3 text-center text-xl font-black bg-white text-gray-900 focus:outline-none focus:border-green-700"
-                    value={pronostico.goles_equipo_1 ?? ''}
-                    onChange={(e) =>
-                      cambiarMarcador(
-                        pronostico.id,
-                        'goles_equipo_1',
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <p className="text-center font-black text-green-800">vs</p>
-
-                  <input
-                    type="number"
-                    min="0"
-                    className="border-2 border-gray-300 rounded-2xl p-3 text-center text-xl font-black bg-white text-gray-900 focus:outline-none focus:border-green-700"
-                    value={pronostico.goles_equipo_2 ?? ''}
-                    onChange={(e) =>
-                      cambiarMarcador(
-                        pronostico.id,
-                        'goles_equipo_2',
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <p className="font-black text-lg text-green-900">
-                    {pronostico.partido.equipo_2.nombre}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => guardarPronostico(pronostico)}
-                  className="mt-5 w-full md:w-auto bg-green-800 hover:bg-green-900 text-white font-black rounded-2xl px-5 py-3 shadow-lg"
+              return (
+                <div
+                  key={pronostico.id}
+                  className="bg-gray-50 border border-gray-200 rounded-3xl p-5 shadow-md"
                 >
-                  Guardar marcador
-                </button>
-              </div>
-            ))}
+                  <p className="text-sm text-gray-700 font-bold mb-4">
+                    Fase {pronostico.partido.fase} · 🗓️{' '}
+                    {formatearFecha(pronostico.partido.fecha_hora)}
+                  </p>
+
+                  {mensajesPorPronostico[pronostico.id] && (
+                    <div
+                      className={`mb-4 border font-bold rounded-xl p-3 ${
+                        estado === 'modificado'
+                          ? 'bg-red-100 border-red-400 text-red-800'
+                          : estado === 'guardado'
+                          ? 'bg-green-100 border-green-400 text-green-900'
+                          : 'bg-yellow-100 border-yellow-400 text-yellow-900'
+                      }`}
+                    >
+                      {mensajesPorPronostico[pronostico.id]}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_90px_40px_90px_1fr] gap-3 items-center">
+                    <p className="font-black text-lg text-green-900 md:text-right">
+                      {pronostico.partido.equipo_1.nombre}
+                    </p>
+
+                    <input
+                      type="number"
+                      min="0"
+                      className={`border-2 rounded-2xl p-3 text-center text-xl font-black text-gray-900 focus:outline-none focus:border-green-700 ${estiloCampo(
+                        estado
+                      )}`}
+                      value={pronostico.goles_equipo_1 ?? ''}
+                      onChange={(e) =>
+                        cambiarMarcador(
+                          pronostico.id,
+                          'goles_equipo_1',
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <p className="text-center font-black text-green-800">vs</p>
+
+                    <input
+                      type="number"
+                      min="0"
+                      className={`border-2 rounded-2xl p-3 text-center text-xl font-black text-gray-900 focus:outline-none focus:border-green-700 ${estiloCampo(
+                        estado
+                      )}`}
+                      value={pronostico.goles_equipo_2 ?? ''}
+                      onChange={(e) =>
+                        cambiarMarcador(
+                          pronostico.id,
+                          'goles_equipo_2',
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <p className="font-black text-lg text-green-900">
+                      {pronostico.partido.equipo_2.nombre}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => guardarPronostico(pronostico)}
+                    className="mt-5 w-full md:w-auto bg-green-800 hover:bg-green-900 text-white font-black rounded-2xl px-5 py-3 shadow-lg"
+                  >
+                    Guardar marcador
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </section>
       </div>

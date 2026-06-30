@@ -37,12 +37,67 @@ function textoMarcador(goles1: number | null, goles2: number | null) {
   return `${goles1} - ${goles2}`
 }
 
+function tipoPronostico(p: any) {
+  if (p.goles_equipo_1 === null || p.goles_equipo_2 === null) return 4
+  if (p.goles_equipo_1 > p.goles_equipo_2) return 1
+  if (p.goles_equipo_1 === p.goles_equipo_2) return 2
+  return 3
+}
+
+function ordenarDentroDePronostico(a: any, b: any) {
+  const tipoA = tipoPronostico(a)
+  const tipoB = tipoPronostico(b)
+
+  if (tipoA !== tipoB) {
+    return tipoA - tipoB
+  }
+
+  if (tipoA === 4) {
+    return (a.usuario?.nombre || '').localeCompare(b.usuario?.nombre || '')
+  }
+
+  if (tipoA === 1) {
+    if (b.goles_equipo_1 !== a.goles_equipo_1) {
+      return b.goles_equipo_1 - a.goles_equipo_1
+    }
+
+    if (b.goles_equipo_2 !== a.goles_equipo_2) {
+      return b.goles_equipo_2 - a.goles_equipo_2
+    }
+  }
+
+  if (tipoA === 2) {
+    if (b.goles_equipo_1 !== a.goles_equipo_1) {
+      return b.goles_equipo_1 - a.goles_equipo_1
+    }
+
+    if (b.goles_equipo_2 !== a.goles_equipo_2) {
+      return b.goles_equipo_2 - a.goles_equipo_2
+    }
+  }
+
+  if (tipoA === 3) {
+    if (b.goles_equipo_2 !== a.goles_equipo_2) {
+      return b.goles_equipo_2 - a.goles_equipo_2
+    }
+
+    if (b.goles_equipo_1 !== a.goles_equipo_1) {
+      return b.goles_equipo_1 - a.goles_equipo_1
+    }
+  }
+
+  return (a.usuario?.nombre || '').localeCompare(b.usuario?.nombre || '')
+}
+
 export default function ResultadosPage() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaColombia(0))
   const [partidos, setPartidos] = useState<any[]>([])
   const [partidoSeleccionado, setPartidoSeleccionado] = useState<any>(null)
   const [pronosticos, setPronosticos] = useState<any[]>([])
-  const [orden, setOrden] = useState<'usuario' | 'puntaje'>('usuario')
+  const [orden, setOrden] = useState<
+    'usuario' | 'puntaje' | 'total' | 'pronostico'
+  >('usuario')
+  const [totales, setTotales] = useState<any>({})
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(false)
 
@@ -119,6 +174,7 @@ export default function ResultadosPage() {
         goles_equipo_2,
         puntos,
         usuario:usuarios!pronosticos_usuario_id_fkey(
+          id,
           nombre
         )
       `)
@@ -129,12 +185,36 @@ export default function ResultadosPage() {
       return
     }
 
+    const { data: posiciones, error: errorPosiciones } = await supabase
+      .from('vista_posiciones')
+      .select('id, puntos')
+
+    if (errorPosiciones) {
+      setMensaje(errorPosiciones.message)
+      return
+    }
+
+    const mapaTotales: any = {}
+
+    ;(posiciones || []).forEach((u: any) => {
+      mapaTotales[u.id] = u.puntos
+    })
+
+    setTotales(mapaTotales)
     setPronosticos(data || [])
   }
 
   const pronosticosOrdenados = [...pronosticos].sort((a, b) => {
     if (orden === 'puntaje') {
       return (b.puntos ?? -1) - (a.puntos ?? -1)
+    }
+
+    if (orden === 'total') {
+      return (totales[b.usuario?.id] ?? 0) - (totales[a.usuario?.id] ?? 0)
+    }
+
+    if (orden === 'pronostico') {
+      return ordenarDentroDePronostico(a, b)
     }
 
     return (a.usuario?.nombre || '').localeCompare(b.usuario?.nombre || '')
@@ -302,7 +382,7 @@ export default function ResultadosPage() {
                     : 'bg-white text-green-800 border-green-800'
                 }`}
               >
-                Ordenar por usuario
+                Alfabético
               </button>
 
               <button
@@ -313,7 +393,29 @@ export default function ResultadosPage() {
                     : 'bg-white text-green-800 border-green-800'
                 }`}
               >
-                Ordenar por puntaje
+                Puntos
+              </button>
+
+              <button
+                onClick={() => setOrden('total')}
+                className={`rounded-2xl px-5 py-3 border-2 font-black ${
+                  orden === 'total'
+                    ? 'bg-green-800 text-white border-green-900'
+                    : 'bg-white text-green-800 border-green-800'
+                }`}
+              >
+                Posición
+              </button>
+
+              <button
+                onClick={() => setOrden('pronostico')}
+                className={`rounded-2xl px-5 py-3 border-2 font-black ${
+                  orden === 'pronostico'
+                    ? 'bg-green-800 text-white border-green-900'
+                    : 'bg-white text-green-800 border-green-800'
+                }`}
+              >
+                Marcador
               </button>
             </div>
 
@@ -327,7 +429,10 @@ export default function ResultadosPage() {
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-[1fr_110px_100px] gap-3 sm:gap-4 items-center">
                     <p className="font-black text-lg sm:text-xl text-green-900 break-words">
-                      {pronostico.usuario?.nombre || 'Usuario sin nombre'}
+                      {pronostico.usuario?.nombre || 'Usuario sin nombre'}{' '}
+                      <span className="text-sm text-gray-600">
+                        ({totales[pronostico.usuario?.id] ?? 0} pts)
+                      </span>
                     </p>
 
                     <p className="text-2xl font-black text-left sm:text-center text-gray-900">
