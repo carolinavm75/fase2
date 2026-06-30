@@ -70,9 +70,9 @@ export default function Home() {
 
   const admin = [
     {
-      titulo: 'Registrar resultados',
+      titulo: 'Registrar Equipos',
       icono: '⚽',
-      ruta: '/registrar-marcador',
+      ruta: '/admin-equipos',
     },
     {
       titulo: 'Restablecer contraseña',
